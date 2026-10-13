@@ -54,6 +54,8 @@ python3 app.py resume --thread obs-001 --team payments --decision approve
 python3 app.py resume --thread obs-001 --team platform-data --decision approve
 ```
 
+To see the score catch a weak run, hold a specialist back: `python3 app.py start --thread obs-005 --alert INC-2041 --skip deploys`. Without the deploy list, the analysis finds the pool symptom but can't name `d-1042`, so it scores `False` (2 of 2 live runs).
+
 Each command prints its Langfuse trace ID. The command that produces the analysis also prints `Score root_cause_correct: True|False`. Set `TRIAGE_GENAI_INSTRUMENT=1` to add the standard `gen_ai.client.*` metrics from `opentelemetry-instrumentation-google-genai` (install it first: `pip install opentelemetry-instrumentation-google-genai==1.2b0`). Its spans are switched off on purpose, because they double every generation in Langfuse.
 
 Runs take 1 to 7 minutes, and Vertex often returns `429 RESOURCE_EXHAUSTED` or times out. Retry with `resume --thread <id>` and no decision.

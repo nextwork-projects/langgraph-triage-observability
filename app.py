@@ -96,6 +96,7 @@ class IncidentState(TypedDict, total=False):
     status: str
     audit_log: list[str]
     runbook_path: str
+    skip_specialists: list[str]
 
 
 class SpecialistTask(TypedDict):
@@ -153,6 +154,11 @@ def route_incident(state: IncidentState):
             ("human", incident_brief(state)),
         ]
     )
+    # Secret Mission: hold a specialist back to see the score catch a weak run.
+    skipped = state.get("skip_specialists", [])
+    decision["specialists"] = [
+        name for name in decision["specialists"] if name not in skipped
+    ]
     print(f"Router: {decision['severity']}, sending {', '.join(decision['specialists'])}")
     return {
         "severity": decision["severity"],
@@ -386,6 +392,13 @@ def parse_args():
     start_parser = subparsers.add_parser("start")
     start_parser.add_argument("--thread", required=True)
     start_parser.add_argument("--alert", required=True)
+    start_parser.add_argument(
+        "--skip",
+        nargs="*",
+        default=[],
+        choices=list(SPECIALISTS),
+        help="Specialists to hold back, to test that the score catches a weak run.",
+    )
 
     resume_parser = subparsers.add_parser("resume")
     resume_parser.add_argument("--thread", required=True)
@@ -427,6 +440,7 @@ def run_command(args, config):
                 "alert": alert,
                 "status": "new",
                 "audit_log": [],
+                "skip_specialists": args.skip,
             }
         elif args.decision:
             pending = graph.get_state(config).interrupts

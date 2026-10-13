@@ -51,3 +51,10 @@ def test_crash_then_resume_in_new_process(tmp_path):
     assert "WORKFLOW PAUSED" in out
     import json
     assert json.loads((tmp_path / "calls.json").read_text()) == {"logs": 1, "deploys": 1, "metrics": 2}
+
+
+def test_skip_holds_a_specialist_back(tmp_path):
+    out = run(tmp_path, "start", "--thread", "inc-skip", "--alert", "INC-2041", "--skip", "deploys")
+    assert "Router: SEV2, sending logs, metrics" in out
+    import json
+    assert json.loads((tmp_path / "calls.json").read_text()) == {"logs": 1, "metrics": 1}
