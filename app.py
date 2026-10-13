@@ -405,7 +405,8 @@ def parse_args():
 def main():
     args = parse_args()
     config = {"configurable": {"thread_id": args.thread}}
-    telemetry.setup_metrics()
+    telemetry.setup_metrics(args.thread)
+    telemetry.instrument_genai()
     try:
         run_command(args, config)
     finally:

@@ -85,8 +85,13 @@ def _http_exporter(project_id: str):
     )
 
 
-def setup_metrics():
-    """Send metrics to Cloud Monitoring through the Telemetry API (OTLP)."""
+def setup_metrics(instance_id: str):
+    """Send metrics to Cloud Monitoring through the Telemetry API (OTLP).
+
+    instance_id becomes the series' instance label. Using the thread ID makes
+    every command on one incident write the same series, so a gauge's latest
+    value is the incident's current state.
+    """
     global _meter_provider
     mode = os.environ.get("TRIAGE_METRICS", "").lower()
     if mode not in ("grpc", "http") or _meter_provider is not None:
@@ -104,6 +109,7 @@ def setup_metrics():
             "service.name": SERVICE_NAME,
             "gcp.project_id": project_id,
             "cloud.region": METRICS_REGION,
+            "service.instance.id": instance_id,
         }
     )
     _meter_provider = MeterProvider(resource=resource, metric_readers=[reader])
@@ -164,6 +170,20 @@ def record_pending(incident_id: str, teams: list[str], pending: list[str]):
         approvals_pending.set(
             pending.count(team), {"team": team, "incident_id": incident_id}
         )
+
+
+def instrument_genai():
+    """Optional: standard gen_ai.* metrics from the google-genai SDK.
+
+    Its spans are switched off: Langfuse's CallbackHandler already records each
+    model call, and keeping both doubles every generation and its cost.
+    """
+    if os.environ.get("TRIAGE_GENAI_INSTRUMENT") != "1":
+        return
+    from opentelemetry.instrumentation.google_genai import GoogleGenAiSdkInstrumentor
+    from opentelemetry.trace import NoOpTracerProvider
+
+    GoogleGenAiSdkInstrumentor().instrument(tracer_provider=NoOpTracerProvider())
 
 
 def shutdown():
