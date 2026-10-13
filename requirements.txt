@@ -2,4 +2,7 @@ langgraph==1.2.14
 langgraph-checkpoint-sqlite==3.1.1
 langchain-google-genai==4.4.0
 langchain==1.4.4
-
+langfuse==4.17.0
+opentelemetry-sdk==1.45.1
+opentelemetry-exporter-otlp-proto-grpc==1.45.1
+opentelemetry-exporter-otlp-proto-http==1.45.1

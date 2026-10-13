@@ -13,7 +13,8 @@ class FakeAgent:
     def invoke(self, payload, config=None):
         self.brief = payload["messages"][0][1]
         self.config = config
-        return {"structured_response": {"summary": "Pool exhausted.", "evidence": ["HikariPool-1 timeout"], "suspected_cause": "d-1042", "severity": "SEV2"}}
+        tool_call = type("Message", (), {"type": "tool"})()
+        return {"messages": [tool_call, tool_call], "structured_response": {"summary": "Pool exhausted.", "evidence": ["HikariPool-1 timeout"], "suspected_cause": "d-1042", "severity": "SEV2"}}
 
 
 def test_runs_one_specialist_on_one_alert(monkeypatch, capsys):

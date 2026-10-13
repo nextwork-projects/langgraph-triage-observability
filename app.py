@@ -12,6 +12,8 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, Send, interrupt
 
 from specialists import SPECIALISTS, alert_brief, build_model, load_json, run_specialist
+import telemetry
+from score import score_run
 
 DB_PATH = "triage_checkpoints.db"
 SEVERITY_ORDER = ["SEV4", "SEV3", "SEV2", "SEV1"]
@@ -403,9 +405,17 @@ def parse_args():
 def main():
     args = parse_args()
     config = {"configurable": {"thread_id": args.thread}}
+    telemetry.setup_metrics()
+    try:
+        run_command(args, config)
+    finally:
+        telemetry.shutdown()
 
+
+def run_command(args, config):
     with SqliteSaver.from_conn_string(DB_PATH) as checkpointer:
         graph = build_graph(checkpointer)
+        had_analysis = "analysis" in graph.get_state(config).values
 
         if args.command == "start":
             alerts = {alert["id"]: alert for alert in load_json("alerts.json")}
@@ -436,16 +446,34 @@ def main():
         else:
             graph_input = None
 
+        trace_extra, handler = telemetry.trace_config(args.thread, args.command)
         try:
             stream = graph.stream_events(
                 graph_input,
-                config=config,
+                config={**config, **trace_extra},
                 durability="sync",
                 version="v3",
             )
             display_stream(stream)
         except Exception as error:
+            telemetry.model_errors.add(1, {"error.type": telemetry.error_type(error)})
             display_failure(graph, config, error)
+
+        snapshot = graph.get_state(config)
+        values = snapshot.values
+        teams = sorted({a["team"] for a in values.get("actions", []) if a["requires_approval"]})
+        pending = [request.value["team"] for request in snapshot.interrupts]
+        telemetry.record_pending(args.thread, teams, pending)
+        if handler and handler.last_trace_id:
+            print(f"Trace: {handler.last_trace_id}")
+            if "analysis" in values and not had_analysis:
+                correct = score_run(
+                    telemetry.langfuse_client(),
+                    handler.last_trace_id,
+                    values["alert"]["id"],
+                    values["analysis"],
+                )
+                print(f"Score root_cause_correct: {correct}")
 
 
 if __name__ == "__main__":
