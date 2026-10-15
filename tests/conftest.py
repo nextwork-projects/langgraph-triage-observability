@@ -15,7 +15,7 @@ class FakeModel:
         self.reply = reply
         self.calls = 0
 
-    def invoke(self, messages):
+    def invoke(self, messages, config=None):
         self.calls += 1
         return self.reply(messages) if callable(self.reply) else self.reply
 

@@ -13,6 +13,7 @@ from langgraph.types import Command, Send, interrupt
 
 from specialists import SPECIALISTS, alert_brief, build_model, load_json, run_specialist
 import telemetry
+from prompts import analyst_messages
 from score import score_run
 
 DB_PATH = "triage_checkpoints.db"
@@ -191,20 +192,11 @@ def investigate(task: SpecialistTask):
 def analyze_incident(state: IncidentState):
     analyst = build_analyst()
     findings = json.dumps(state["findings"], indent=2)
+    # Secret Mission: the prompt comes from Langfuse, and the generation links to its version.
+    prompt, messages = analyst_messages(state["incident"], findings)
     analysis = analyst.invoke(
-        [
-            (
-                "system",
-                "You are an SRE incident analyst. Combine the specialists' "
-                "findings into one diagnosis and name the most likely cause with "
-                "its evidence. Propose one reversible remediation step for each "
-                "service the evidence implicates: the alerting service and every "
-                "dependency named in the findings' evidence, at most three. Each "
-                "service's owning team must approve its own step. Keep every "
-                "field concise.",
-            ),
-            ("human", f"{state['incident']}\n\nFindings:\n{findings}"),
-        ]
+        messages,
+        config={"metadata": {"langfuse_prompt": prompt}} if prompt else None,
     )
     return {
         "analysis": analysis,
@@ -418,8 +410,6 @@ def parse_args():
 def main():
     args = parse_args()
     config = {"configurable": {"thread_id": args.thread}}
-    telemetry.setup_metrics(args.thread)
-    telemetry.instrument_genai()
     try:
         run_command(args, config)
     finally:
@@ -429,7 +419,7 @@ def main():
 def run_command(args, config):
     with SqliteSaver.from_conn_string(DB_PATH) as checkpointer:
         graph = build_graph(checkpointer)
-        had_analysis = "analysis" in graph.get_state(config).values
+        before = graph.get_state(config).values
 
         if args.command == "start":
             alerts = {alert["id"]: alert for alert in load_json("alerts.json")}
@@ -461,7 +451,11 @@ def run_command(args, config):
         else:
             graph_input = None
 
-        trace_extra, handler = telemetry.trace_config(args.thread, args.command)
+        alert_id = args.alert if args.command == "start" else before["alert"]["id"]
+        skip = args.skip if args.command == "start" else before.get("skip_specialists", [])
+        trace_extra, handler = telemetry.trace_config(
+            args.thread, args.command, alert_id, skip
+        )
         try:
             stream = graph.stream_events(
                 graph_input,
@@ -471,25 +465,19 @@ def run_command(args, config):
             )
             display_stream(stream)
         except Exception as error:
-            telemetry.model_errors.add(1, {"error.type": telemetry.error_type(error)})
             display_failure(graph, config, error)
 
-        snapshot = graph.get_state(config)
-        values = snapshot.values
-        teams = sorted({a["team"] for a in values.get("actions", []) if a["requires_approval"]})
-        pending = [request.value["team"] for request in snapshot.interrupts]
-        telemetry.record_pending(args.thread, teams, pending)
+        values = graph.get_state(config).values
         if handler and handler.last_trace_id:
-            print(f"Trace: {handler.last_trace_id}")
-            if "analysis" in values and not had_analysis:
+            print(f"Trace: {telemetry.trace_url(handler.last_trace_id)}")
+            if "analysis" in values and "analysis" not in before:
                 correct = score_run(
                     telemetry.langfuse_client(),
                     handler.last_trace_id,
-                    values["alert"]["id"],
+                    alert_id,
                     values["analysis"],
                 )
                 print(f"Score root_cause_correct: {correct}")
-
 
 if __name__ == "__main__":
     main()

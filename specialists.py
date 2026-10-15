@@ -8,8 +8,6 @@ from langchain.agents import create_agent
 from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from telemetry import time_specialist
-
 # Keep every specialist on one model and one fixture directory.
 MODEL_ID = "gemini-3.7-flash"
 DATA_DIR = Path(__file__).parent / "data"
@@ -126,14 +124,10 @@ def build_specialist(name: str):
 
 
 def run_specialist(name: str, brief: str) -> dict:
-    with time_specialist(name) as outcome:
-        result = build_specialist(name).invoke(
-            {"messages": [("human", brief)]},
-            config={"recursion_limit": 25},
-        )
-        outcome["tool_calls"] = sum(
-            message.type == "tool" for message in result["messages"]
-        )
+    result = build_specialist(name).invoke(
+        {"messages": [("human", brief)]},
+        config={"recursion_limit": 25},
+    )
     return result["structured_response"]
 
 
