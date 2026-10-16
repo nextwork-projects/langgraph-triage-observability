@@ -1,8 +1,9 @@
 """Secret Mission: serve the analyst prompt from Langfuse prompt management.
 
-`python3 prompts.py push` uploads the Part 2 prompt as version 1 with the
-`production` label. After that, every analysis fetches the `production`
-version, and Langfuse links each analyst generation to the version it used.
+`python3 prompts.py push` uploads the original analyst prompt as version 1
+with the `production` label. After that, every analysis fetches the
+`production` version, and Langfuse links each analyst generation to the
+version it used.
 """
 import telemetry
 
@@ -53,7 +54,7 @@ def push():
         type="chat",
         prompt=ANALYST_MESSAGES,
         labels=["production"],
-        commit_message="Analyst prompt from Part 2",
+        commit_message="Original analyst prompt",
     )
     telemetry.shutdown()
     print(f"Created {ANALYST_PROMPT} v{prompt.version} with the production label.")
