@@ -13,8 +13,8 @@ The system works, but from the terminal a run that is slow, expensive, or confid
 | `app.py` | The triage workflow: `start` and `resume` commands, router, parallel specialists, synthesis, per-team approval gates |
 | `specialists.py` | The specialist agents and the tools that read `data/` |
 | `status.py` | A read-only status board for a thread |
-| `requirements.txt` | Pinned packages from the triage Project. You add the Langfuse pin in Step 1 |
-| `.env.example` | The Google Cloud project ID and Langfuse keys you fill in during Step 1 |
+| `requirements.txt` | Pinned packages from the triage Project, plus the Langfuse SDK pin you use from Step 2 |
+| `.env.example` | Template for `.env`: you copy it in Step 1 and fill in your Google Cloud project ID and Langfuse keys |
 | `data/alerts.json` | Two alerts to triage: `INC-2041` (checkout errors) and `INC-2042` (search latency) |
 | `data/logs.jsonl`, `data/deploys.json`, `data/metrics.json`, `data/services.json` | Logs, recent deploys, metric time series, and the service catalog the specialists read |
 | `tests/` | Offline tests with fake models |
